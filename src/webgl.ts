@@ -3,7 +3,7 @@ import {inflate} from 'pako';
 
 // Load the gzip file and decompress it.
 async function loadPolygons() {
-  const response = await fetch("data_processing/polygons.json.gz");
+  const response = await fetch("https://github.com/platers/Coastline-Paradox/blob/master/data_processing/polygons.json.gz?raw=true");
   const arrayBuffer = await response.arrayBuffer();
   const decompressed = inflate(new Uint8Array(arrayBuffer), { to: "string" });
   return JSON.parse(decompressed);
@@ -84,7 +84,7 @@ async function main() {
 
   // draw the polygons
   const polygons = await loadPolygons();
-  
+
 }
 
 // Returns a random integer from 0 to range - 1.
