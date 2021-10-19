@@ -1,4 +1,14 @@
 import * as webglUtils from './webgl-utils';
+import {inflate} from 'pako';
+
+// Load the gzip file and decompress it.
+async function loadPolygons() {
+  const response = await fetch("data_processing/polygons.json.gz");
+  const arrayBuffer = await response.arrayBuffer();
+  const decompressed = inflate(new Uint8Array(arrayBuffer), { to: "string" });
+  return JSON.parse(decompressed);
+}
+
 
 function main() {
   // Get A WebGL context
