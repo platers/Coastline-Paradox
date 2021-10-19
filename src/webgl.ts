@@ -10,7 +10,7 @@ async function loadPolygons() {
 }
 
 
-function main() {
+async function main() {
   // Get A WebGL context
   var canvas = document.querySelector("#canvas") as HTMLCanvasElement;
   var gl = canvas.getContext("webgl");
@@ -81,6 +81,10 @@ function main() {
     var count = 4;
     gl.drawArrays(primitiveType, offset, count);
   }
+
+  // draw the polygons
+  const polygons = await loadPolygons();
+  
 }
 
 // Returns a random integer from 0 to range - 1.
