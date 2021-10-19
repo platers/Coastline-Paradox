@@ -1,3 +1,4 @@
 data
 .DS_Store
-polygons.json.gz
+node_modules
+*.js
