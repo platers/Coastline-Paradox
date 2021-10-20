@@ -3,8 +3,9 @@ import {inflate} from 'pako';
 
 // Load the gzip file and decompress it.
 async function loadPolygons() {
-  const response = await fetch("https://github.com/platers/Coastline-Paradox/blob/master/data_processing/polygons.json.gz?raw=true");
+  const response = await fetch("https://platers.github.io/Coastline-Paradox/data_processing/polygons.json.gz");
   const arrayBuffer = await response.arrayBuffer();
+  console.log(arrayBuffer);
   const decompressed = inflate(new Uint8Array(arrayBuffer), { to: "string" });
   return JSON.parse(decompressed);
 }
