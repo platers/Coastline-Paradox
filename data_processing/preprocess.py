@@ -33,40 +33,34 @@ def read_polygons(data_dir='data_processing/gshhg-shp-2.3.7/GSHHS_shp/f/'):
 
 # Convert latitude and longitude to square coordinates.
 def get_square(lat, long, precision, verbose=False):
-    if verbose:
-        print("Lat: " + str(lat) + ", Long: " + str(long))
     s = ''
     if precision == 0:
         return s
 
-    # Quadrants are numbered clockwise from the top left.
-    if lat >= 0:
-        if long >= 0:
-            s = '2'
+    for _ in range(precision):
+        if verbose:
+            print("Lat: " + str(lat) + ", Long: " + str(long))
+        # Quadrants are numbered clockwise from the top left.
+        if lat >= 0:
+            if long >= 0:
+                s += '2'
+                lat = 2 * lat - 90
+                long = 2 * long - 180
+            else:
+                s += '1'
+                lat = 2 * lat - 90
+                long = 2 * long + 180
         else:
-            s = '1'
-    else:
-        if long >= 0:
-            s = '3'
-        else:
-            s = '4'
-
-    # Rescale the coordinates for the small quadrant.
-    # Translate to the top left quadrant.
-    if s == '1':
-        lat = 2 * lat - 90
-        long = 2 * long + 180
-    elif s == '2':
-        lat = 2 * lat - 90
-        long = 2 * long - 180
-    elif s == '3':
-        lat = 2 * lat + 90
-        long = 2 * long - 180
-    elif s == '4':
-        lat = 2 * lat + 90
-        long = 2 * long + 180
+            if long >= 0:
+                s += '3'
+                lat = 2 * lat + 90
+                long = 2 * long - 180
+            else:
+                s += '4'
+                lat = 2 * lat + 90
+                long = 2 * long + 180
     
-    return s + get_square(lat, long, precision - 1)
+    return s
 
 def get_lines(polygons):
     lines = []
