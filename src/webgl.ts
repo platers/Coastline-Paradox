@@ -11,7 +11,7 @@ async function loadPolygons() {
 }
 
 
-async function main() {
+export async function main() {
   // Get A WebGL context
   var canvas = document.querySelector("#canvas") as HTMLCanvasElement;
   var gl = canvas.getContext("webgl");
@@ -97,5 +97,3 @@ function randomInt(range) {
 function setLine(gl, line) {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(line), gl.STATIC_DRAW);
 }
-
-main();

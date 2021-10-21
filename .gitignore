@@ -3,3 +3,4 @@ data
 node_modules
 *.js
 data_processing/gshhg-shp-2.3.7/*
+secrets.ts
