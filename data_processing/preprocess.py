@@ -75,7 +75,7 @@ def interpolate(p1, p2, precision):
     num_pts = max(4, int(4 * dist / square_dim))
     return [(x1 + i * (x2 - x1) / (num_pts - 1), y1 + i * (y2 - y1) / (num_pts - 1)) for i in range(num_pts + 1)]
 
-def process_chunks(lines, box, square, max_size, chunks, bar):
+def process_chunks(lines, box, square, max_size, resolution, chunks, bar):
     def line_intersects_box(line, box): # box is a tuple of ((x1, y1), (x2, y2)) top left and bottom right corners
         def line_segment_intersect(line1, line2):
             x1, y1 = line1[0]
@@ -100,7 +100,7 @@ def process_chunks(lines, box, square, max_size, chunks, bar):
     
     if len(lines) <= max_size:
         if len(lines) > 0:
-            chunks[square] = lines
+            chunks[resolution + square] = lines
         bar.update(4 ** -len(square))
         return
     
@@ -124,14 +124,14 @@ def process_chunks(lines, box, square, max_size, chunks, bar):
     
     # Recursively process the quadrants.
     for i in range(4):
-        process_chunks(quadrants[i], quadrant_boxes[i], square + str(i + 1), max_size, chunks, bar)
+        process_chunks(quadrants[i], quadrant_boxes[i], square + str(i + 1), max_size, resolution, chunks, bar)
 
 # Return a dictionary mapping square coordinates to each line that intersects that square.
-def chunk_lines(lines, max_size):
+def chunk_lines(lines, max_size, resolution):
     print("Chunking lines...")
     bar = tqdm(total=1)
     chunks = {}
-    process_chunks(lines, ((-180, -90), (180, 90)), '', max_size, chunks, bar)
+    process_chunks(lines, ((-180, -90), (180, 90)), '', max_size, resolution, chunks, bar)
     return chunks
 
 # Plot distribution of number of lines in each chunk.
@@ -174,7 +174,8 @@ def plot_chunk_distribution(chunks):
 
 
 if __name__ == '__main__':    
-    polygons = read_polygons(data_dir='data_processing/gshhg-shp-2.3.7/GSHHS_shp/f/') # change f to i for faster testing
+    resolution = 'c'
+    polygons = read_polygons(data_dir='data_processing/gshhg-shp-2.3.7/GSHHS_shp/' + resolution + '/') # change f to i for faster testing
 
     print("Total number of polygons: " + str(len(polygons)))
     print("Total number of points: " + str(sum([len(polygon) for polygon in polygons])))
@@ -183,16 +184,16 @@ if __name__ == '__main__':
     print("Number of lines:", len(lines))
 
     max_size = 500
-    chunks = chunk_lines(lines, max_size)
+    chunks = chunk_lines(lines, max_size, resolution)
     print("Number of chunks:", len(chunks))
     print("Number of lines in chunks:", sum([len(chunk) for chunk in chunks.values()]))
     print("Average number of lines in a chunk:", sum([len(chunk) for chunk in chunks.values()]) / len(chunks))
     print("Maximum chunk depth:" + str(max([len(chunk) for chunk in chunks.keys()])))
 
     # save chunks to file
-    with open('chunks.json', 'w') as f:
+    with open('data_processing/chunks/' + resolution + '.json', 'w') as f:
         json.dump(chunks, f)
 
-    plot_chunk_distribution(chunks)
+    # plot_chunk_distribution(chunks)
 
     
