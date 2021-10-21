@@ -1,5 +1,5 @@
 data
 .DS_Store
 node_modules
-*.js
+dist/*.js
 data_processing/gshhg-shp-2.3.7/*

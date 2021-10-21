@@ -1,17 +1,6 @@
 import * as webglUtils from './webgl-utils';
-import {inflate} from 'pako';
 
-// Load the gzip file and decompress it.
-async function loadPolygons() {
-  const response = await fetch("https://platers.github.io/Coastline-Paradox/data_processing/polygons.json.gz");
-  const arrayBuffer = await response.arrayBuffer();
-  console.log(arrayBuffer);
-  const decompressed = inflate(new Uint8Array(arrayBuffer), { to: "string" });
-  return JSON.parse(decompressed);
-}
-
-
-async function main() {
+export async function main() {
   // Get A WebGL context
   var canvas = document.querySelector("#canvas") as HTMLCanvasElement;
   var gl = canvas.getContext("webgl");
@@ -83,9 +72,6 @@ async function main() {
     gl.drawArrays(primitiveType, offset, count);
   }
 
-  // draw the polygons
-  const polygons = await loadPolygons();
-
 }
 
 // Returns a random integer from 0 to range - 1.
@@ -97,5 +83,3 @@ function randomInt(range) {
 function setLine(gl, line) {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(line), gl.STATIC_DRAW);
 }
-
-main();
