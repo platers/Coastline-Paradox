@@ -1,15 +1,4 @@
 import * as webglUtils from './webgl-utils';
-import {inflate} from 'pako';
-
-// Load the gzip file and decompress it.
-async function loadPolygons() {
-  const response = await fetch("https://platers.github.io/Coastline-Paradox/data_processing/polygons.json.gz");
-  const arrayBuffer = await response.arrayBuffer();
-  console.log(arrayBuffer);
-  const decompressed = inflate(new Uint8Array(arrayBuffer), { to: "string" });
-  return JSON.parse(decompressed);
-}
-
 
 export async function main() {
   // Get A WebGL context
@@ -82,9 +71,6 @@ export async function main() {
     var count = 4;
     gl.drawArrays(primitiveType, offset, count);
   }
-
-  // draw the polygons
-  const polygons = await loadPolygons();
 
 }
 
