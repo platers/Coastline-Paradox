@@ -4,6 +4,8 @@ import os
 import shapefile
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from multiprocessing import Pool
+import time
 
 def read_polygons(data_dir='data_processing/gshhg-shp-2.3.7/GSHHS_shp/f/'):
     polygons = [] # List of polygons. Each polygon is a list of points, [(x1, y1), (x2, y2), ...].
@@ -73,34 +75,39 @@ def get_lines(polygons):
             lines.append((polygon[i], polygon[i + 1]))
     return lines
 
+def interpolate(p1, p2, precision):
+    x1, y1 = p1
+    x2, y2 = p2
+    square_dim = 180 / (2 ** precision)
+    dist = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+    num_pts = max(4, int(4 * dist / square_dim))
+    return [(x1 + i * (x2 - x1) / (num_pts - 1), y1 + i * (y2 - y1) / (num_pts - 1)) for i in range(num_pts + 1)]
+
+def get_chunks(line, precision):
+    chunks = []
+    interpolations = interpolate(line[0], line[1], precision)
+    for interpolation in interpolations:
+        square = get_square(interpolation[0], interpolation[1], precision)
+        chunks.append(square)
+    return list(set(chunks))
+
 # Return a dictionary mapping square coordinates to each line that intersects that square.
 def chunk_lines(lines, precision):
-    num_interpolations = []
-    def interpolate(p1, p2):
-        x1, y1 = p1
-        x2, y2 = p2
-        square_dim = 180 / (2 ** precision)
-        dist = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
-        num_pts = max(4, int(4 * dist / square_dim))
-        num_interpolations.append(num_pts)
-        return [(x1 + i * (x2 - x1) / (num_pts - 1), y1 + i * (y2 - y1) / (num_pts - 1)) for i in range(num_pts + 1)]
+
+    print("Chunking lines...")
+    t0 = time.time()
+    with Pool(processes=8) as pool:
+        inputs = list(map(lambda line: (line, precision), lines))
+        line_chunks = pool.starmap(get_chunks, tqdm(inputs, total=len(inputs)))
 
     chunks = {}
-    print("Chunking lines...")
-    for line in tqdm(lines):
-        interpolations = interpolate(line[0], line[1])
-        for interpolation in interpolations:
-            square = get_square(interpolation[0], interpolation[1], precision)
-            if square not in chunks:
-                chunks[square] = []
-            chunks[square].append(line)
-
-    # Remove duplicate lines.
-    print("Removing duplicate lines...")
-    for square in tqdm(chunks):
-        chunks[square] = list(set(chunks[square]))
-
-    print("Average interpolations:", sum(num_interpolations) / len(num_interpolations))
+    for i in range(len(lines)):
+        for chunk in line_chunks[i]:
+            if chunk not in chunks:
+                chunks[chunk] = []
+            chunks[chunk].append(lines[i])
+    t1 = time.time()
+    print("Chunking took " + str(t1 - t0) + " seconds.")
     return chunks
 
 # Plot distribution of number of lines in each chunk.
@@ -112,7 +119,7 @@ def plot_chunk_distribution(chunks):
     plt.show()
 
 
-def main():
+if __name__ == '__main__':    
     polygons = read_polygons()
 
     print("Total number of polygons: " + str(len(polygons)))
@@ -134,4 +141,3 @@ def unit_test():
     assert(get_square(-30, 30, 2) == '31')
 
 unit_test()
-main()
