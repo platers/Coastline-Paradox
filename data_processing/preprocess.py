@@ -78,29 +78,66 @@ def interpolate(p1, p2, precision):
     num_pts = max(4, int(4 * dist / square_dim))
     return [(x1 + i * (x2 - x1) / (num_pts - 1), y1 + i * (y2 - y1) / (num_pts - 1)) for i in range(num_pts + 1)]
 
-def get_chunks(line, precision):
-    chunks = []
-    interpolations = interpolate(line[0], line[1], precision)
-    for interpolation in interpolations:
-        square = get_square(interpolation[0], interpolation[1], precision)
-        chunks.append(square)
-    return list(set(chunks))
+def process_chunks(lines, box, square, max_size, chunks):
+    def line_intersects_box(line, box): # box is a tuple of ((x1, y1), (x2, y2)) top left and bottom right corners
+        def line_segment_intersect(line1, line2):
+            x1, y1 = line1[0]
+            x2, y2 = line1[1]
+            x3, y3 = line2[0]
+            x4, y4 = line2[1]
+            denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1)
+            if denom == 0:
+                return False
+            ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom
+            ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom
+            return ua >= 0 and ua <= 1 and ub >= 0 and ub <= 1
+        
+        def line_inside_box(line, box): 
+            x1, y1 = line[0]
+            x2, y2 = line[1]
+            return min(x1, x2) >= box[0][0] and min(y1, y2) >= box[0][1] and max(x1, x2) <= box[1][0] and max(y1, y2) <= box[1][1]
+        
+        corners = [(box[0][0], box[0][1]), (box[0][0], box[1][1]), (box[1][0], box[1][1]), (box[1][0], box[0][1])]
+        sides = [(corners[0], corners[1]), (corners[1], corners[2]), (corners[2], corners[3]), (corners[3], corners[0])]
+        return any(line_segment_intersect(line, side) for side in sides) or line_inside_box(line, box)
+    
+    if len(lines) == 0:
+        return
+    if len(lines) <= max_size:
+        chunks[square] = lines
+        return
+    
+    # Determine which quadrants the line intersects.
+    top_left, bottom_right = box
+    x1, y1 = top_left
+    x2, y2 = bottom_right
+    x_mid = (x1 + x2) / 2
+    y_mid = (y1 + y2) / 2
+    quadrant_boxes = [
+        ((x1, y1), (x_mid, y_mid)),
+        ((x_mid, y1), (x2, y_mid)),
+        ((x_mid, y_mid), (x2, y2)),
+        ((x1, y_mid), (x_mid, y2))
+    ]
+    quadrants = [[] for _ in range(4)]
+    for line in lines:
+        for i in range(4):
+            if line_intersects_box(line, quadrant_boxes[i]):
+                quadrants[i].append(line)
+    
+    # Recursively process the quadrants.
+    for i in range(4):
+        process_chunks(quadrants[i], quadrant_boxes[i], square + str(i + 1), max_size, chunks)
 
 # Return a dictionary mapping square coordinates to each line that intersects that square.
-def chunk_lines(lines, precision):
+def chunk_lines(lines, max_size):
 
     print("Chunking lines...")
     t0 = time.time()
-    with Pool() as pool:
-        inputs = list(map(lambda line: (line, precision), lines))
-        line_chunks = pool.starmap(get_chunks, tqdm(inputs, total=len(inputs)))
-
+    
     chunks = {}
-    for i in range(len(lines)):
-        for chunk in line_chunks[i]:
-            if chunk not in chunks:
-                chunks[chunk] = []
-            chunks[chunk].append(lines[i])
+    process_chunks(lines, ((-180, -90), (180, 90)), '', max_size, chunks)
+
     t1 = time.time()
     print("Chunking took " + str(t1 - t0) + " seconds.")
     return chunks
@@ -142,11 +179,10 @@ def plot_chunk_distribution(chunks):
     plt.colorbar()
     plt.show()
 
-        
 
 
 if __name__ == '__main__':    
-    polygons = read_polygons(data_dir='data_processing/gshhg-shp-2.3.7/GSHHS_shp/f/') # change f to i for faster testing
+    polygons = read_polygons(data_dir='data_processing/gshhg-shp-2.3.7/GSHHS_shp/i/') # change f to i for faster testing
 
     print("Total number of polygons: " + str(len(polygons)))
     print("Total number of points: " + str(sum([len(polygon) for polygon in polygons])))
@@ -154,11 +190,12 @@ if __name__ == '__main__':
     lines = get_lines(polygons)
     print("Number of lines:", len(lines))
 
-    precision = 8
-    chunks = chunk_lines(lines, precision)
+    max_size = 100
+    chunks = chunk_lines(lines, max_size)
     print("Number of chunks:", len(chunks))
     print("Number of lines in chunks:", sum([len(chunk) for chunk in chunks.values()]))
     print("Average number of lines in a chunk:", sum([len(chunk) for chunk in chunks.values()]) / len(chunks))
-    plot_chunk_distribution(chunks)
+    print("Maximum chunk depth:" + str(max([len(chunk) for chunk in chunks.keys()])))
+    # plot_chunk_distribution(chunks)
 
     
