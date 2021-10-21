@@ -6,27 +6,28 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
 import time
+import numpy as np
 
 def read_polygons(data_dir='data_processing/gshhg-shp-2.3.7/GSHHS_shp/f/'):
     polygons = [] # List of polygons. Each polygon is a list of points, [(x1, y1), (x2, y2), ...].
     for file in os.listdir(data_dir):
         if file.endswith(".shp"):
-        # Open the shapefile.
+            # Open the shapefile.
             sf = shapefile.Reader(data_dir + file)
-        # Get the shapefile's geometry.
+            # Get the shapefile's geometry.
             shapes = sf.shapes()
 
-        # Print a summary of the shapefile.
+            # Print a summary of the shapefile.
             print("Shapefile: " + file)
             print("Number of shapes: " + str(len(shapes)))
-        #print("Fields", fields)
+            #print("Fields", fields)
 
-        # Iterate through all shapes in the shapefile.
+            # Iterate through all shapes in the shapefile.
             for i in range(len(shapes)):
-            # Get the shape's geometry.
-                shape = shapes[i]
+                # Get the shape's geometry. Flip the x-coordinates
 
-                polygons.append(shape.points)
+                points = list(map(lambda point: (-point[0], point[1]), shapes[i].points))
+                polygons.append(points)
 
     return polygons
 
@@ -43,20 +44,20 @@ def get_square(lat, long, precision, verbose=False):
         # Quadrants are numbered clockwise from the top left.
         if lat >= 0:
             if long >= 0:
-                s += '2'
+                s += '1'
                 lat = 2 * lat - 90
                 long = 2 * long - 180
             else:
-                s += '1'
+                s += '4'
                 lat = 2 * lat - 90
                 long = 2 * long + 180
         else:
             if long >= 0:
-                s += '3'
+                s += '2'
                 lat = 2 * lat + 90
                 long = 2 * long - 180
             else:
-                s += '4'
+                s += '3'
                 lat = 2 * lat + 90
                 long = 2 * long + 180
     
@@ -90,7 +91,7 @@ def chunk_lines(lines, precision):
 
     print("Chunking lines...")
     t0 = time.time()
-    with Pool(processes=8) as pool:
+    with Pool() as pool:
         inputs = list(map(lambda line: (line, precision), lines))
         line_chunks = pool.starmap(get_chunks, tqdm(inputs, total=len(inputs)))
 
@@ -108,13 +109,44 @@ def chunk_lines(lines, precision):
 def plot_chunk_distribution(chunks):
     plt.hist([len(chunk) for chunk in chunks.values()])
     plt.yscale('log')
-    plt.ylabel('Number of lines')
-    plt.xlabel('Number of chunks')
+    plt.xlabel('Number of lines')
+    plt.ylabel('Number of chunks')
+    # plt.show()
+    plt.clf()
+
+    # plot heatmap of chunks
+    def get_chunk_coords(chunk):
+        lvl = len(chunk)
+        if lvl == 0:
+            return (0, 0)
+        
+        lvl -= 1
+        if chunk[0] == '1':
+            x, y = 0, 0
+        elif chunk[0] == '2':
+            x, y = 2 ** lvl, 0
+        elif chunk[0] == '3':
+            x, y = 2 ** lvl, 2 ** lvl
+        elif chunk[0] == '4':
+            x, y = 0, 2 ** lvl
+        
+        cc = get_chunk_coords(chunk[1:])
+        return (x + cc[0], y + cc[1])
+
+    precision = len(list(chunks.keys())[0])
+    arr = np.zeros((2 ** precision, 2 ** precision))
+    for chunk, lines in chunks.items():
+        x, y = get_chunk_coords(chunk)
+        arr[y, x] = np.log(len(lines))
+    plt.imshow(arr, cmap='hot', interpolation='nearest')
+    plt.colorbar()
     plt.show()
+
+        
 
 
 if __name__ == '__main__':    
-    polygons = read_polygons()
+    polygons = read_polygons(data_dir='data_processing/gshhg-shp-2.3.7/GSHHS_shp/f/') # change f to i for faster testing
 
     print("Total number of polygons: " + str(len(polygons)))
     print("Total number of points: " + str(sum([len(polygon) for polygon in polygons])))
@@ -122,7 +154,7 @@ if __name__ == '__main__':
     lines = get_lines(polygons)
     print("Number of lines:", len(lines))
 
-    precision = 10
+    precision = 8
     chunks = chunk_lines(lines, precision)
     print("Number of chunks:", len(chunks))
     print("Number of lines in chunks:", sum([len(chunk) for chunk in chunks.values()]))
@@ -130,8 +162,3 @@ if __name__ == '__main__':
     plot_chunk_distribution(chunks)
 
     
-def unit_test():
-    assert(get_square(90, 180, 4) == '2222')
-    assert(get_square(-30, 30, 2) == '31')
-
-unit_test()
