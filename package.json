@@ -17,6 +17,6 @@
   },
   "scripts": {
     "dev": "npx rollup --config rollup.config.js -w",
-    "build": "npx rollup --config rollup.config.js"
+    "build": "npx rollup -c rollup.config.js"
   }
 }
