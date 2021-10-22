@@ -6,6 +6,7 @@ type Chunk = string;
 type Chunks = {
   [key: Chunk]: Line[];
 };
+type ViewPort = [Point, Point]; // [top-left, bottom-right]
 
 export async function main(chunks: Chunks) {
   // Get A WebGL context
@@ -15,25 +16,22 @@ export async function main(chunks: Chunks) {
     return;
   }
 
-  var { resolutionUniformLocation, offset } = setupGl(gl);
-
+  var { viewportUniformLocation } = setupGl(gl);
+  const viewport: ViewPort = [ [0, 0], [180, 90] ];
 
   // Render loop
-  function render(timestamp: number) {
+  function render() {
     // Clear the canvas
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    // set the resolution
-    gl.uniform2f(resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
+    // set the viewport
+    gl.uniform4f(viewportUniformLocation, viewport[0][0], viewport[0][1], viewport[1][0], viewport[1][1]);
 
     // Get lines
     const lines = getLines(chunks);
 
-    // flatten the lines into a single array
-    const normalized_lines = lines.flat().map(point => [(1 - (point[0] + 180) / 360) * gl.canvas.width, (1 - (point[1] + 90) / 180) * gl.canvas.height]);
-
-    setLine(gl, normalized_lines.flat());
+    setLine(gl, lines.flat().flat());
     drawLines(gl, lines.length);
 
     window.requestAnimationFrame(render);
@@ -68,7 +66,7 @@ function setupGl(gl: WebGLRenderingContext) {
   var positionAttributeLocation = gl.getAttribLocation(program, "a_position");
 
   // look up uniform locations
-  var resolutionUniformLocation = gl.getUniformLocation(program, "u_resolution");
+  var viewportUniformLocation = gl.getUniformLocation(program, "u_viewport");
 
   // Create a buffer to put three 2d clip space points in
   var positionBuffer = gl.createBuffer();
@@ -102,7 +100,7 @@ function setupGl(gl: WebGLRenderingContext) {
   var offset = 0; // start at the beginning of the buffer
   gl.vertexAttribPointer(
     positionAttributeLocation, size, type, normalize, stride, offset);
-  return { resolutionUniformLocation, offset };
+  return { viewportUniformLocation };
 }
 
 function setLine(gl, line) {
