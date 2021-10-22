@@ -25,12 +25,10 @@ const dbRef = ref(getDatabase());
 get(query(dbRef)).then((snapshot) => {
   if (snapshot.exists()) {
     console.log(snapshot.val());
+    main(snapshot.val());
   } else {
     console.log("No data available");
   }
 }).catch((error) => {
   console.error(error);
 });
-
-
-main();

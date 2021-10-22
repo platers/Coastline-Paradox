@@ -5,9 +5,9 @@ import shapefile
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from multiprocessing import Pool
-import time
 import numpy as np
 import json
+from PIL import Image, ImageDraw
 
 def read_polygons(data_dir):
     polygons = [] # List of polygons. Each polygon is a list of points, [(x1, y1), (x2, y2), ...].
@@ -28,6 +28,23 @@ def read_polygons(data_dir):
 
     return polygons
 
+'''
+Display all the lines using Pillow.
+'''
+def view_lines(lines):
+    with Image.new('RGB', (8000, 8000), 'white') as im:
+        draw = ImageDraw.Draw(im)
+        for line in lines:
+            # Convert the line to square coordinates.
+            x1, y1 = line[0]
+            x2, y2 = line[1]
+            x1 = (180 - x1) * 8000 / 360
+            x2 = (180 - x2) * 8000 / 360
+            y1 = (90 - y1) * 8000 / 180
+            y2 = (90 - y2) * 8000 / 180
+            draw.line((x1, y1, x2, y2), fill='black', width=3)
+        im.show()
+    
 
 # Convert latitude and longitude to square coordinates.
 def get_square(lat, long, precision, verbose=False):
@@ -118,9 +135,12 @@ def process_chunks(lines, box, square, max_size, resolution, chunks, bar):
     ]
     quadrants = [[] for _ in range(4)]
     for line in lines:
+        in_quadrant = False
         for i in range(4):
             if line_intersects_box(line, quadrant_boxes[i]):
                 quadrants[i].append(line)
+                in_quadrant = True
+        assert in_quadrant
     
     # Recursively process the quadrants.
     for i in range(4):
@@ -177,11 +197,13 @@ if __name__ == '__main__':
     resolution = 'c'
     polygons = read_polygons(data_dir='data_processing/gshhg-shp-2.3.7/GSHHS_shp/' + resolution + '/') # change f to i for faster testing
 
+
     print("Total number of polygons: " + str(len(polygons)))
     print("Total number of points: " + str(sum([len(polygon) for polygon in polygons])))
 
     lines = get_lines(polygons)
     print("Number of lines:", len(lines))
+    view_lines(lines)
 
     max_size = 500
     chunks = chunk_lines(lines, max_size, resolution)

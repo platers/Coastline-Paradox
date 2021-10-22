@@ -1,6 +1,13 @@
 import * as webglUtils from './webgl-utils';
 
-export async function main() {
+type Point = [number, number];
+type Line = [Point, Point];
+type Chunk = string;
+type Chunks = {
+  [key: Chunk]: Line[];
+};
+
+export async function main(chunks: Chunks) {
   // Get A WebGL context
   var canvas = document.querySelector("#canvas") as HTMLCanvasElement;
   var gl = canvas.getContext("webgl");
@@ -57,29 +64,18 @@ export async function main() {
   // set the resolution
   gl.uniform2f(resolutionUniformLocation, gl.canvas.width, gl.canvas.height);
 
-  // draw 50 random rectangles in random colors
-  for (var ii = 0; ii < 10; ++ii) {
-    var line = [];
-    for (var jj = 0; jj < 9; ++jj) {
-        line.push(randomInt(1000));
-    }
-    setLine(gl, line);
-
+  for (const [chunk, lines] of Object.entries(chunks)) {
+    // flatten the lines into a single array
+    const normalized_lines = lines.flat().map(point => [(1 - (point[0] + 180) / 360) * gl.canvas.width, (1 - (point[1] + 90) / 180) * gl.canvas.height]);
+    setLine(gl, normalized_lines.flat());
     // Draw the loop.
-    var primitiveType = gl.LINE_LOOP;
+    var primitiveType = gl.LINES;
     var offset = 0;
-    var count = 4;
+    var count = lines.length * 2;
     gl.drawArrays(primitiveType, offset, count);
   }
-
 }
 
-// Returns a random integer from 0 to range - 1.
-function randomInt(range) {
-  return Math.floor(Math.random() * range);
-}
-
-// Fill the buffer with the values that define a rectangle.
 function setLine(gl, line) {
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(line), gl.STATIC_DRAW);
 }
