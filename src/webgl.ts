@@ -77,6 +77,25 @@ function normalizeViewport(viewport: ViewPort) {
     p2[1] -= diff / 2;
   }
 
+  // make sure view does not go above or below the poles
+  if (p2[1] > 90) {
+    if (Math.abs(p1[1] - 90) < Math.abs(p2[1] - 90)) { // p1 is closer to the pole
+      const diff = p1[1] - 90;
+      p1[1] -= diff;
+      p2[1] -= diff;
+    } else {
+      const diff = p2[1] - 90;
+      p1[1] -= diff;
+      p2[1] -= diff;
+    }
+  }
+
+  if (p1[1] < -90) {
+    const diff = p1[1] + 90;
+    // p1[1] += diff;
+    // p2[1] += diff;
+  }
+
   return [p1, p2];
 }
 
