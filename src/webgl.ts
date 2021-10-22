@@ -17,7 +17,7 @@ export async function main(chunks: Chunks) {
   }
 
   var { viewportUniformLocation } = setupGl(gl);
-  const viewport: ViewPort = [ [0, 0], [180, 90] ];
+  const viewport: ViewPort = [ [-180, -90], [180, 90] ];
 
   // Render loop
   function render() {
@@ -29,7 +29,7 @@ export async function main(chunks: Chunks) {
     gl.uniform4f(viewportUniformLocation, viewport[0][0], viewport[0][1], viewport[1][0], viewport[1][1]);
 
     // Get lines
-    const lines = getLines(chunks);
+    const lines = getLines(chunks, viewport);
 
     setLine(gl, lines.flat().flat());
     drawLines(gl, lines.length);
@@ -37,6 +37,36 @@ export async function main(chunks: Chunks) {
     window.requestAnimationFrame(render);
   }
   window.requestAnimationFrame(render);
+
+  // Event handlers
+  document.addEventListener("keydown", e => {
+    if (e.key === "ArrowLeft") {
+      console.log("pan left");
+      viewport[0][0] += 10;
+      viewport[1][0] += 10;
+    }
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight") {
+      console.log("pan right");
+      viewport[0][0] -= 10;
+      viewport[1][0] -= 10;
+    }
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "ArrowUp") {
+      console.log("pan up");
+      viewport[0][1] += 10;
+      viewport[1][1] += 10;
+    }
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key === "ArrowDown") {
+      console.log("pan down");
+      viewport[0][1] -= 10;
+      viewport[1][1] -= 10;
+    }
+  });
 }
 
 function drawLines(gl: WebGLRenderingContext, count: number) {
@@ -45,12 +75,33 @@ function drawLines(gl: WebGLRenderingContext, count: number) {
   gl.drawArrays(primitiveType, offset, count * 2);
 }
 
-function getLines(chunks: Chunks) {
+function getLines(chunks: Chunks, viewport: ViewPort) {
   let lines: Line[] = [];
   // flatten the lines into a single array
   for (const [chunk, lines1] of Object.entries(chunks)) {
     lines = lines.concat(lines1);
   }
+  lines = lines.map(line => {
+    const [p1, p2] = line;
+    // wrap line to be right and under the top left corner
+    while (p1[0] < viewport[0][0] && p2[0] < viewport[0][0]) {
+      p1[0] += 360;
+      p2[0] += 360;
+    }
+    while (p1[1] < viewport[0][1] && p2[1] < viewport[0][1]) {
+      p1[1] += 180;
+      p2[1] += 180;
+    }
+    while (p1[0] - 360 > viewport[0][0] && p2[0] - 360 > viewport[0][0]) {
+      p1[0] -= 360;
+      p2[0] -= 360;
+    }
+    while (p1[1] - 180 > viewport[0][1] && p2[1] - 180 > viewport[0][1]) {
+      p1[1] -= 180;
+      p2[1] -= 180;
+    }
+    return [p1, p2];
+  });
   return lines;
 }
 
@@ -63,7 +114,7 @@ function setupGl(gl: WebGLRenderingContext) {
   var program = webglUtils.createProgram(gl, vertexShaderSource, fragmentShaderSource);
 
   // look up where the vertex data needs to go.
-  var positionAttributeLocation = gl.getAttribLocation(program, "a_position");
+  var lineAttributeLocation = gl.getAttribLocation(program, "a_position");
 
   // look up uniform locations
   var viewportUniformLocation = gl.getUniformLocation(program, "u_viewport");
@@ -87,7 +138,7 @@ function setupGl(gl: WebGLRenderingContext) {
   gl.useProgram(program);
 
   // Turn on the attribute
-  gl.enableVertexAttribArray(positionAttributeLocation);
+  gl.enableVertexAttribArray(lineAttributeLocation);
 
   // Bind the position buffer.
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -99,7 +150,7 @@ function setupGl(gl: WebGLRenderingContext) {
   var stride = 0; // 0 = move forward size * sizeof(type) each iteration to get the next position
   var offset = 0; // start at the beginning of the buffer
   gl.vertexAttribPointer(
-    positionAttributeLocation, size, type, normalize, stride, offset);
+    lineAttributeLocation, size, type, normalize, stride, offset);
   return { viewportUniformLocation };
 }
 
