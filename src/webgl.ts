@@ -1,12 +1,141 @@
+import { normalize } from 'path/posix';
 import * as webglUtils from './webgl-utils';
 
-type Point = [number, number];
-type Line = [Point, Point];
+type RawPoint = [number, number];
+type RawLine = [RawPoint, RawPoint];
 type Chunk = string;
 type Chunks = {
-  [key: Chunk]: Line[];
+  [key: Chunk]: RawLine[];
 };
-type ViewPort = [Point, Point]; // [top-left, bottom-right]
+
+enum Direction {
+  Up,
+  Down,
+  Left,
+  Right,
+}
+
+class Point {
+  constructor(public x: number, public y: number) {
+  }
+}
+
+class Line {
+  constructor(public p1: Point, public p2: Point) {
+  }
+}
+  
+
+class ViewPort {
+  constructor(public p1: Point, public p2: Point) {
+    // p1 is bottom right, p2 is top left
+  }
+
+  get width() {
+    return this.p2.x - this.p1.x;
+  }
+  
+  get height() {
+    return this.p2.y - this.p1.y;
+  }
+
+  pan(direction: Direction, amount = 0.1) {
+    const dx = this.width * amount;
+    const dy = this.height * amount;
+    switch (direction) {
+      case Direction.Up:
+        this.p1.y += dy;
+        this.p2.y += dy;
+        break;
+      case Direction.Down:
+        this.p1.y -= dy;
+        this.p2.y -= dy;
+        break;
+      case Direction.Left:
+        this.p1.x += dx;
+        this.p2.x += dx;
+        break;
+      case Direction.Right:
+        this.p1.x -= dx;
+        this.p2.x -= dx;
+        break;
+    }
+    this.normalize();
+  }
+
+  screenToRelative(screen: Point, canvas: HTMLCanvasElement) {
+    const x = screen.x / canvas.clientWidth;
+    const y = screen.y / canvas.clientHeight;
+    return new Point(x, y);
+  }
+
+  screenToLatLng(screen: Point, canvas: HTMLCanvasElement) {
+    console.log("screenToLatLng", screen);
+    const lat = this.p2.y - (screen.y / canvas.height) * this.height;
+    const lng = this.p2.x - (screen.x / canvas.width) * this.width;
+    console.log("screenToLatLng", lat, lng);
+    return new Point(lng, lat);
+  }
+  
+  zoom(cursor: Point, canvas: HTMLCanvasElement, amount = 0.1) {
+    console.log("zoom", cursor);
+    const width = this.width * (1 + amount);
+    const height = this.height * (1 + amount);
+    const relCursor = this.screenToRelative(cursor, canvas);
+    const cursorLatLng = this.screenToLatLng(cursor, canvas);
+    this.p2 = new Point(cursorLatLng.x + width * relCursor.x, cursorLatLng.y + height * relCursor.y);
+    this.p1 = new Point(this.p2.x - width, this.p2.y - height);
+    this.normalize();
+  }
+
+  normalize() {
+    // translate to small coordinates
+    while (this.p1.x > 180) {
+      this.p1.x -= 360;
+      this.p2.x -= 360;
+    }
+    while (this.p1.y > 90) {
+      this.p1.y -= 180;
+      this.p2.y -= 180;
+    }
+    while (this.p1.x < -180) {
+      this.p1.x += 360;
+      this.p2.x += 360;
+    }
+    while (this.p1.y < -90) {
+      this.p1.y += 180;
+      this.p2.y += 180;
+    }
+
+    // make sure width < 360 and height < 180
+    const width = this.p2.x - this.p1.x;
+    const height = this.p2.y - this.p1.y;
+    if (width > 360) {
+      const diff = width - 360;
+      this.p1.x += diff / 2;
+      this.p2.x -= diff / 2;
+    }
+    if (height > 180) {
+      const diff = height - 180;
+      this.p1.y += diff / 2;
+      this.p2.y -= diff / 2;
+    }
+
+    // make sure view does not go above or below the poles
+    if (this.p2.y > 90) {
+      if (Math.abs(this.p1.y - 90) < Math.abs(this.p2.y - 90)) { // this.p1 is closer to the pole
+        const diff = this.p1.y - 90;
+        this.p1.y -= diff;
+        this.p2.y -= diff;
+      } else {
+        const diff = this.p2.y - 90;
+        this.p1.y -= diff;
+        this.p2.y -= diff;
+      }
+    }
+  }
+}
+
 
 export async function main(chunks: Chunks) {
   // Get A WebGL context
@@ -17,7 +146,7 @@ export async function main(chunks: Chunks) {
   }
 
   var { viewportUniformLocation } = setupGl(gl);
-  const viewport: ViewPort = [ [-180, -90], [180, 90] ];
+  const viewport: ViewPort = new ViewPort(new Point(-180, -90), new Point(180, 90));
 
   // Render loop
   function render() {
@@ -26,7 +155,7 @@ export async function main(chunks: Chunks) {
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     // set the viewport
-    gl.uniform4f(viewportUniformLocation, viewport[0][0], viewport[0][1], viewport[1][0], viewport[1][1]);
+    gl.uniform4f(viewportUniformLocation, viewport.p1.x, viewport.p1.y, viewport.p2.x, viewport.p2.y);
 
     // Get lines
     const lines = getLines(chunks, viewport);
@@ -40,121 +169,37 @@ export async function main(chunks: Chunks) {
 
   // Event handlers
   addKeyboardArrowHandlers(viewport);
-  addScrollHandlers(viewport);
+  addScrollHandlers(viewport, canvas);
 }
 
-function normalizeViewport(viewport: ViewPort) {
-  const [p1, p2] = viewport;
-  // translate to small coordinates
-  while (p1[0] > 180) {
-    p1[0] -= 360;
-    p2[0] -= 360;
-  }
-  while (p1[1] > 90) {
-    p1[1] -= 180;
-    p2[1] -= 180;
-  }
-  while (p1[0] < -180) {
-    p1[0] += 360;
-    p2[0] += 360;
-  }
-  while (p1[1] < -90) {
-    p1[1] += 180;
-    p2[1] += 180;
-  }
-
-  // make sure width < 360 and height < 180
-  const width = p2[0] - p1[0];
-  const height = p2[1] - p1[1];
-  if (width > 360) {
-    const diff = width - 360;
-    p1[0] += diff / 2;
-    p2[0] -= diff / 2;
-  }
-  if (height > 180) {
-    const diff = height - 180;
-    p1[1] += diff / 2;
-    p2[1] -= diff / 2;
-  }
-
-  // make sure view does not go above or below the poles
-  if (p2[1] > 90) {
-    if (Math.abs(p1[1] - 90) < Math.abs(p2[1] - 90)) { // p1 is closer to the pole
-      const diff = p1[1] - 90;
-      p1[1] -= diff;
-      p2[1] -= diff;
-    } else {
-      const diff = p2[1] - 90;
-      p1[1] -= diff;
-      p2[1] -= diff;
-    }
-  }
-
-  if (p1[1] < -90) {
-    const diff = p1[1] + 90;
-    // p1[1] += diff;
-    // p2[1] += diff;
-  }
-
-  return [p1, p2];
-}
 
 function addKeyboardArrowHandlers(viewport: ViewPort) {
   document.addEventListener("keydown", e => {
     if (e.key === "ArrowLeft") {
-      console.log("pan left");
-      viewport[0][0] += 10;
-      viewport[1][0] += 10;
+      viewport.pan(Direction.Left);
     }
-    normalizeViewport(viewport);
   });
   document.addEventListener("keydown", e => {
     if (e.key === "ArrowRight") {
-      console.log("pan right");
-      viewport[0][0] -= 10;
-      viewport[1][0] -= 10;
+      viewport.pan(Direction.Right);
     }
-    normalizeViewport(viewport);
   });
   document.addEventListener("keydown", e => {
     if (e.key === "ArrowUp") {
-      console.log("pan up");
-      viewport[0][1] += 10;
-      viewport[1][1] += 10;
+      viewport.pan(Direction.Up);
     }
-    normalizeViewport(viewport);
   });
   document.addEventListener("keydown", e => {
     if (e.key === "ArrowDown") {
-      console.log("pan down");
-      viewport[0][1] -= 10;
-      viewport[1][1] -= 10;
+      viewport.pan(Direction.Down);
     }
-    normalizeViewport(viewport);
   });
 }
 
-function addScrollHandlers(viewport: ViewPort) {
+function addScrollHandlers(viewport: ViewPort, canvas: HTMLCanvasElement) {
   document.addEventListener("wheel", e => {
-    const delta = e.deltaY;
-    const width = viewport[1][0] - viewport[0][0];
-    const height = viewport[1][1] - viewport[0][1];
-    if (delta < 0) {
-      console.log("zoom in");
-      // shrink viewport by 10%
-      viewport[0][0] += width * 0.1;
-      viewport[0][1] += height * 0.1;
-      viewport[1][0] -= width * 0.1;
-      viewport[1][1] -= height * 0.1;
-    } else if (delta > 0) {
-      console.log("zoom out");
-      // grow viewport by 10%
-      viewport[0][0] -= width * 0.1;
-      viewport[0][1] -= height * 0.1;
-      viewport[1][0] += width * 0.1;
-      viewport[1][1] += height * 0.1;
-    }
-    normalizeViewport(viewport);
+    const amount = e.deltaY > 0 ? 0.1 : -0.1;
+    viewport.zoom(new Point(e.x, e.y), canvas, amount);
   });
 }
 
@@ -165,27 +210,28 @@ function drawLines(gl: WebGLRenderingContext, count: number) {
 }
 
 function getLines(chunks: Chunks, viewport: ViewPort) {
-  let lines: Line[] = [];
+  let lines: RawLine[] = [];
   // flatten the lines into a single array
   for (const [chunk, lines1] of Object.entries(chunks)) {
     lines = lines.concat(lines1);
   }
   lines = lines.map(line => {
     const [p1, p2] = line;
+    const vp1 = viewport.p1;
     // wrap line to be right and under the top left corner
-    while (p1[0] < viewport[0][0] && p2[0] < viewport[0][0]) {
+    while (p1[0] < vp1.x && p2[0] < vp1.x) {
       p1[0] += 360;
       p2[0] += 360;
     }
-    while (p1[1] < viewport[0][1] && p2[1] < viewport[0][1]) {
+    while (p1[1] < vp1.y && p2[1] < vp1.y) {
       p1[1] += 180;
       p2[1] += 180;
     }
-    while (p1[0] - 360 > viewport[0][0] && p2[0] - 360 > viewport[0][0]) {
+    while (p1[0] - 360 > vp1.x && p2[0] - 360 > vp1.x) {
       p1[0] -= 360;
       p2[0] -= 360;
     }
-    while (p1[1] - 180 > viewport[0][1] && p2[1] - 180 > viewport[0][1]) {
+    while (p1[1] - 180 > vp1.y && p2[1] - 180 > vp1.y) {
       p1[1] -= 180;
       p2[1] -= 180;
     }
