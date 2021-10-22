@@ -39,12 +39,55 @@ export async function main(chunks: Chunks) {
   window.requestAnimationFrame(render);
 
   // Event handlers
+  addKeyboardArrowHandlers(viewport);
+  addScrollHandlers(viewport);
+}
+
+function normalizeViewport(viewport: ViewPort) {
+  const [p1, p2] = viewport;
+  // translate to small coordinates
+  while (p1[0] > 180) {
+    p1[0] -= 360;
+    p2[0] -= 360;
+  }
+  while (p1[1] > 90) {
+    p1[1] -= 180;
+    p2[1] -= 180;
+  }
+  while (p1[0] < -180) {
+    p1[0] += 360;
+    p2[0] += 360;
+  }
+  while (p1[1] < -90) {
+    p1[1] += 180;
+    p2[1] += 180;
+  }
+
+  // make sure width < 360 and height < 180
+  const width = p2[0] - p1[0];
+  const height = p2[1] - p1[1];
+  if (width > 360) {
+    const diff = width - 360;
+    p1[0] += diff / 2;
+    p2[0] -= diff / 2;
+  }
+  if (height > 180) {
+    const diff = height - 180;
+    p1[1] += diff / 2;
+    p2[1] -= diff / 2;
+  }
+
+  return [p1, p2];
+}
+
+function addKeyboardArrowHandlers(viewport: ViewPort) {
   document.addEventListener("keydown", e => {
     if (e.key === "ArrowLeft") {
       console.log("pan left");
       viewport[0][0] += 10;
       viewport[1][0] += 10;
     }
+    normalizeViewport(viewport);
   });
   document.addEventListener("keydown", e => {
     if (e.key === "ArrowRight") {
@@ -52,6 +95,7 @@ export async function main(chunks: Chunks) {
       viewport[0][0] -= 10;
       viewport[1][0] -= 10;
     }
+    normalizeViewport(viewport);
   });
   document.addEventListener("keydown", e => {
     if (e.key === "ArrowUp") {
@@ -59,6 +103,7 @@ export async function main(chunks: Chunks) {
       viewport[0][1] += 10;
       viewport[1][1] += 10;
     }
+    normalizeViewport(viewport);
   });
   document.addEventListener("keydown", e => {
     if (e.key === "ArrowDown") {
@@ -66,6 +111,31 @@ export async function main(chunks: Chunks) {
       viewport[0][1] -= 10;
       viewport[1][1] -= 10;
     }
+    normalizeViewport(viewport);
+  });
+}
+
+function addScrollHandlers(viewport: ViewPort) {
+  document.addEventListener("wheel", e => {
+    const delta = e.deltaY;
+    const width = viewport[1][0] - viewport[0][0];
+    const height = viewport[1][1] - viewport[0][1];
+    if (delta < 0) {
+      console.log("zoom in");
+      // shrink viewport by 10%
+      viewport[0][0] += width * 0.1;
+      viewport[0][1] += height * 0.1;
+      viewport[1][0] -= width * 0.1;
+      viewport[1][1] -= height * 0.1;
+    } else if (delta > 0) {
+      console.log("zoom out");
+      // grow viewport by 10%
+      viewport[0][0] -= width * 0.1;
+      viewport[0][1] -= height * 0.1;
+      viewport[1][0] += width * 0.1;
+      viewport[1][1] += height * 0.1;
+    }
+    normalizeViewport(viewport);
   });
 }
 
