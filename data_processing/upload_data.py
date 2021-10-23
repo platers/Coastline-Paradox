@@ -10,6 +10,12 @@ default_app = firebase_admin.initialize_app(cred_obj, {
 
 ref = db.reference('/')
 
-with open('data_processing/chunks/c.json') as json_file:
-    data = json.load(json_file)
+resolutions = ['c', 'l']
+data = {}
+for resolution in resolutions:
+    with open('data_processing/chunks/{}.json'.format(resolution)) as json_file:
+        d = json.load(json_file)
+        # merge d into data
+        data.update(d)
+print(data.keys())
 ref.set(data)

@@ -9,7 +9,7 @@ import numpy as np
 import json
 from PIL import Image, ImageDraw
 
-def read_polygons(data_dir):
+def read_polygons(data_dir, verbose=False):
     polygons = [] # List of polygons. Each polygon is a list of points, [(x1, y1), (x2, y2), ...].
     for file in os.listdir(data_dir):
         if file.endswith(".shp"):
@@ -18,8 +18,9 @@ def read_polygons(data_dir):
             # Get the shapefile's geometry.
             shapes = sf.shapes()
             # Print a summary of the shapefile.
-            print("Shapefile: " + file)
-            print("Number of shapes: " + str(len(shapes)))
+            if verbose:
+                print("Shapefile: " + file)
+                print("Number of shapes: " + str(len(shapes)))
             # Iterate through all shapes in the shapefile.
             for i in range(len(shapes)):
                 # Get the shape's geometry. Flip the x-coordinates
@@ -193,29 +194,33 @@ def plot_chunk_distribution(chunks):
 
 
 
-if __name__ == '__main__':    
-    resolution = 'c'
+def process_polygons(resolution, verbose=False):
     polygons = read_polygons(data_dir='data_processing/gshhg-shp-2.3.7/GSHHS_shp/' + resolution + '/') # change f to i for faster testing
-
-
-    print("Total number of polygons: " + str(len(polygons)))
-    print("Total number of points: " + str(sum([len(polygon) for polygon in polygons])))
-
     lines = get_lines(polygons)
-    print("Number of lines:", len(lines))
-    view_lines(lines)
+    if verbose:
+        print("Total number of polygons: " + str(len(polygons)))
+        print("Total number of points: " + str(sum([len(polygon) for polygon in polygons])))
+        print("Number of lines:", len(lines))
+        # view_lines(lines)
 
     max_size = 500
     chunks = chunk_lines(lines, max_size, resolution)
-    print("Number of chunks:", len(chunks))
-    print("Number of lines in chunks:", sum([len(chunk) for chunk in chunks.values()]))
-    print("Average number of lines in a chunk:", sum([len(chunk) for chunk in chunks.values()]) / len(chunks))
-    print("Maximum chunk depth:" + str(max([len(chunk) for chunk in chunks.keys()])))
+
+    if verbose:
+        print("Number of chunks:", len(chunks))
+        print("Number of lines in chunks:", sum([len(chunk) for chunk in chunks.values()]))
+        print("Average number of lines in a chunk:", sum([len(chunk) for chunk in chunks.values()]) / len(chunks))
+        print("Maximum chunk depth:" + str(max([len(chunk) for chunk in chunks.keys()])))
 
     # save chunks to file
     with open('data_processing/chunks/' + resolution + '.json', 'w') as f:
         json.dump(chunks, f)
 
     # plot_chunk_distribution(chunks)
+
+if __name__ == '__main__':    
+    resolutions = ['c', 'l', 'i', 'h', 'f']
+    for resolution in resolutions:
+        process_polygons(resolution, verbose=False)
 
     

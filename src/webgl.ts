@@ -1,6 +1,7 @@
+import { addKeyboardArrowHandlers, addScrollHandlers, addMouseHandlers } from './controls';
 import { Chunkloader } from './chunkloader';
 import { Chunks, RawLine } from './types';
-import { ViewPort, Point, Direction } from './viewport';
+import { ViewPort, Point } from './viewport';
 import * as webglUtils from './webgl-utils';
 
 export async function main(chunkloader: Chunkloader) {
@@ -18,6 +19,12 @@ export async function main(chunkloader: Chunkloader) {
 
   // Render loop
   async function render() {
+    // Get chunks
+    chunkloader.loadChunks(viewport);
+    // log cache size
+    console.log(chunkloader.cacheSize());
+    
+
     // Tell WebGL how to convert from clip space to pixels
     gl.viewport(0, 0, canvas.width, canvas.height);
     // Clear the canvas
@@ -27,11 +34,8 @@ export async function main(chunkloader: Chunkloader) {
     // set the viewport
     gl.uniform4f(viewportUniformLocation, viewport.p1.x, viewport.p1.y, viewport.p2.x, viewport.p2.y);
 
-    // Get chunks
-    await chunkloader.loadChunks(viewport);
-
     // Get lines
-    const lines = getLines(chunkloader.cache, viewport);
+    const lines = chunkloader.getLines(viewport);
 
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(lines.flat().flat()), gl.STATIC_DRAW);
     drawLines(gl, lines.length);
@@ -47,86 +51,10 @@ export async function main(chunkloader: Chunkloader) {
 }
 
 
-function addKeyboardArrowHandlers(viewport: ViewPort) {
-  document.addEventListener("keydown", e => {
-    if (e.key === "ArrowLeft") {
-      viewport.pan(Direction.Left);
-    }
-  });
-  document.addEventListener("keydown", e => {
-    if (e.key === "ArrowRight") {
-      viewport.pan(Direction.Right);
-    }
-  });
-  document.addEventListener("keydown", e => {
-    if (e.key === "ArrowUp") {
-      viewport.pan(Direction.Up);
-    }
-  });
-  document.addEventListener("keydown", e => {
-    if (e.key === "ArrowDown") {
-      viewport.pan(Direction.Down);
-    }
-  });
-}
-
-function addMouseHandlers(viewport: ViewPort, lockedLatLng: Point, canvas: HTMLCanvasElement) {
-  canvas.addEventListener("mousedown", e => {
-    lockedLatLng = viewport.screenToLatLng(new Point(e.x, e.y), canvas);
-  });
-  canvas.addEventListener("mouseup", e => {
-    lockedLatLng = null;
-  });
-  canvas.addEventListener("mousemove", e => {
-    if (lockedLatLng) {
-      const cursor = new Point(e.x, e.y);
-      viewport.panTo(cursor, lockedLatLng, canvas);
-    }
-  });
-}
-
-function addScrollHandlers(viewport: ViewPort, canvas: HTMLCanvasElement) {
-  document.addEventListener("wheel", e => {
-    const amount = e.deltaY > 0 ? 0.1 : -0.1;
-    viewport.zoom(new Point(e.x, e.y), canvas, amount);
-  });
-}
-
 function drawLines(gl: WebGLRenderingContext, count: number) {
   var primitiveType = gl.LINES;
   var offset = 0;
   gl.drawArrays(primitiveType, offset, count * 2);
-}
-
-function getLines(chunks: Chunks, viewport: ViewPort) {
-  let lines: RawLine[] = [];
-  // flatten the lines into a single array
-  for (const [chunk, lines1] of Object.entries(chunks)) {
-    lines = lines.concat(lines1);
-  }
-  lines = lines.map(line => {
-    const [p1, p2] = line;
-    const vp1 = viewport.p1;
-    // wrap line to be right and under the top left corner
-    while (p1[0] < vp1.x && p2[0] < vp1.x) {
-      p1[0] += 360;
-      p2[0] += 360;
-    }
-    while (p1[1] < vp1.y && p2[1] < vp1.y) {
-      p1[1] += 180;
-      p2[1] += 180;
-    }
-    while (p1[0] - 360 > vp1.x && p2[0] - 360 > vp1.x) {
-      p1[0] -= 360;
-      p2[0] -= 360;
-    }
-    while (p1[1] - 180 > vp1.y && p2[1] - 180 > vp1.y) {
-      p1[1] -= 180;
-      p2[1] -= 180;
-    }
-    return [p1, p2];
-  });
-  return lines;
 }
 
 function setupGl(gl: WebGLRenderingContext) {

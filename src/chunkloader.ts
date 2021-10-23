@@ -1,12 +1,11 @@
 import { Chunk, Chunks, RawLine } from "./types";
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, query, get, DatabaseReference, child, QueryConstraint, Database, startAt, orderByKey, endBefore } from "firebase/database";
+import { getDatabase, ref, query, get, DatabaseReference, child, QueryConstraint, Database, startAt, orderByKey, endBefore, limitToLast } from "firebase/database";
 import { Point, ViewPort } from "./viewport";
 
 export class Chunkloader {
     public cache: Chunks = {};
     private dbRef: DatabaseReference;
-    private db: Database;
     private padding = 1.4;
 
     constructor() {
@@ -32,10 +31,24 @@ export class Chunkloader {
         this.dbRef = ref(db);
     }
 
+    public getResolution(viewport: ViewPort) {
+        const width = viewport.width;
+        const maxWidth = 360;
+        const ratio = width / maxWidth;
+        const p = 0.3;
+        const resolutions = ['c', 'l', 'i'];
+        for (let i = 0; i < resolutions.length; i++) {
+            if (ratio > p ** (i + 1)) {
+                return resolutions[i];
+            }
+        }
+        return 'i';
+    }
+
     public getChunksInView(viewport: ViewPort): Chunk[] {
         const target = viewport.scale(this.padding);
         const chunks: Chunk[] = [];
-        const resolution = 'c';
+        const resolution = this.getResolution(viewport);
 
         function addChunksInBox(box: ViewPort, chunk: Chunk) {
             if (!box.intersects(target)) {
@@ -47,7 +60,7 @@ export class Chunkloader {
             } else {
                 const subBoxes = box.getQuadrants();
                 for (let i = 0; i < subBoxes.length; i++) {
-                    addChunksInBox(subBoxes[i], chunk + i);
+                    addChunksInBox(subBoxes[i], chunk + (i + 1));
                 }
             }
         }
@@ -86,18 +99,66 @@ export class Chunkloader {
             return;
         }
         console.log(`Loading chunk ${chunk}`);
+        this.cache[chunk] = [];
         const snapshot = await get(query(this.dbRef, orderByKey(), startAt(chunk), endBefore(this.nextChunk(chunk))));
         console.log(snapshot.val());
         if (!snapshot.exists()) {
             this.cache[chunk] = [];
             // Query parent chunk
-            return this.loadChunk(chunk.slice(0, -1));
+            const parentSnapshot = await get(query(this.dbRef, orderByKey(), startAt(chunk[0]), endBefore(chunk), limitToLast(1)));
+            if (!parentSnapshot.exists()) {
+                console.log(`Could not find parent. (should not happen)`);
+                return;
+            }
+
+            Object.assign(this.cache, parentSnapshot.val());
+            return this.cache[chunk];
         }
         
         Object.assign(this.cache, snapshot.val());
-        if (!this.cache[chunk]) {
-            this.cache[chunk] = [];
-        }
         return this.cache[chunk];
+    }
+
+    public getLines(viewport: ViewPort) {
+        let lines: RawLine[] = [];
+        const resolution = this.getResolution(viewport);
+        // flatten the lines into a single array
+        for (const [chunk, lines1] of Object.entries(this.cache)) {
+            if (chunk.startsWith(resolution)) {
+                lines = lines.concat(lines1);
+            }
+        }
+        lines = lines.map(line => {
+            const [p1, p2] = line;
+            const vp1 = viewport.p1;
+            // wrap line to be right and under the top left corner
+            while (p1[0] < vp1.x && p2[0] < vp1.x) {
+            p1[0] += 360;
+            p2[0] += 360;
+            }
+            while (p1[1] < vp1.y && p2[1] < vp1.y) {
+            p1[1] += 180;
+            p2[1] += 180;
+            }
+            while (p1[0] - 360 > vp1.x && p2[0] - 360 > vp1.x) {
+            p1[0] -= 360;
+            p2[0] -= 360;
+            }
+            while (p1[1] - 180 > vp1.y && p2[1] - 180 > vp1.y) {
+            p1[1] -= 180;
+            p2[1] -= 180;
+            }
+            return [p1, p2];
+        });
+        return lines;
+    }
+
+    // Returns the number of lines in the cache
+    public cacheSize() {
+        let size = 0;
+        for (const [chunk, lines] of Object.entries(this.cache)) {
+            size += lines.length;
+        }
+        return size; 
     }
 }
