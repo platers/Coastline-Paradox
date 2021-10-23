@@ -128,4 +128,44 @@ export class ViewPort {
       }
     }
   }
+
+  scale(multiplyBy: number) {
+    const width = this.width * multiplyBy;
+    const height = this.height * multiplyBy;
+    const center = new Point(this.p1.x + this.width / 2, this.p1.y + this.height / 2);
+    const newP1 = new Point(center.x - width / 2, center.y - height / 2);
+    const newP2 = new Point(center.x + width / 2, center.y + height / 2);
+    return new ViewPort(newP1, newP2);
+  }
+
+  clone() {
+    return new ViewPort(new Point(this.p1.x, this.p1.y), new Point(this.p2.x, this.p2.y));
+  }
+
+  intersectionArea(other: ViewPort) {
+    const x_overlap = Math.max(0, Math.min(this.p2.x, other.p2.x) - Math.max(this.p1.x, other.p1.x));
+    const y_overlap = Math.max(0, Math.min(this.p2.y, other.p2.y) - Math.max(this.p1.y, other.p1.y));
+    return x_overlap * y_overlap;
+  }
+  
+  intersects(other: ViewPort) {
+    return this.intersectionArea(other) > 0;
+  }
+
+  area() {
+    return this.width * this.height;
+  }
+
+  getQuadrants() {
+    const width = this.width / 2;
+    const height = this.height / 2;
+    const quadrants = [
+      new ViewPort(new Point(this.p1.x, this.p1.y), new Point(this.p1.x + width, this.p1.y + height)),
+      new ViewPort(new Point(this.p1.x + width, this.p1.y), new Point(this.p2.x, this.p1.y + height)),
+      new ViewPort(new Point(this.p1.x + width, this.p1.y + height), new Point(this.p2.x, this.p2.y)),
+      new ViewPort(new Point(this.p1.x, this.p1.y + height), new Point(this.p1.x + width, this.p2.y)),
+    ]
+    return quadrants;
+  }
+
 }

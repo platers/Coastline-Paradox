@@ -1,14 +1,9 @@
+import { Chunkloader } from './chunkloader';
+import { Chunks, RawLine } from './types';
 import { ViewPort, Point, Direction } from './viewport';
 import * as webglUtils from './webgl-utils';
 
-type RawPoint = [number, number];
-type RawLine = [RawPoint, RawPoint];
-type Chunk = string;
-type Chunks = {
-  [key: Chunk]: RawLine[];
-};
-
-export async function main(chunks: Chunks) {
+export async function main(chunkloader: Chunkloader) {
   // Get A WebGL context
   const canvas = document.querySelector("#canvas") as HTMLCanvasElement;
   const gl = canvas.getContext("webgl");
@@ -22,7 +17,9 @@ export async function main(chunks: Chunks) {
   let lockedLatLng: Point | null = null;
 
   // Render loop
-  function render() {
+  async function render() {
+    // Tell WebGL how to convert from clip space to pixels
+    gl.viewport(0, 0, canvas.width, canvas.height);
     // Clear the canvas
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -30,8 +27,11 @@ export async function main(chunks: Chunks) {
     // set the viewport
     gl.uniform4f(viewportUniformLocation, viewport.p1.x, viewport.p1.y, viewport.p2.x, viewport.p2.y);
 
+    // Get chunks
+    await chunkloader.loadChunks(viewport);
+
     // Get lines
-    const lines = getLines(chunks, viewport);
+    const lines = getLines(chunkloader.cache, viewport);
 
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(lines.flat().flat()), gl.STATIC_DRAW);
     drawLines(gl, lines.length);
@@ -72,7 +72,6 @@ function addKeyboardArrowHandlers(viewport: ViewPort) {
 
 function addMouseHandlers(viewport: ViewPort, lockedLatLng: Point, canvas: HTMLCanvasElement) {
   canvas.addEventListener("mousedown", e => {
-    console.log(e);
     lockedLatLng = viewport.screenToLatLng(new Point(e.x, e.y), canvas);
   });
   canvas.addEventListener("mouseup", e => {
@@ -152,8 +151,6 @@ function setupGl(gl: WebGLRenderingContext) {
 
   webglUtils.resizeCanvasToDisplaySize(gl.canvas);
 
-  // Tell WebGL how to convert from clip space to pixels
-  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
   // Clear the canvas
   gl.clearColor(0, 0, 0, 0);
