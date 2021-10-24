@@ -147,9 +147,24 @@ export class ViewPort {
     const y_overlap = Math.max(0, Math.min(this.p2.y, other.p2.y) - Math.max(this.p1.y, other.p1.y));
     return x_overlap * y_overlap;
   }
-  
+  normalizedIntersectionArea(other: ViewPort) {
+    const dx = 360, dy = 180;
+    let maxArea = 0;
+    for (let i = -2; i <= 2; i++) {
+      for (let j = -2; j <= 2; j++) {
+        const p1 = new Point(this.p1.x + i * dx, this.p1.y + j * dy);
+        const p2 = new Point(this.p2.x + i * dx, this.p2.y + j * dy);
+        const area = new ViewPort(p1, p2).intersectionArea(other);
+        if (area > maxArea) {
+          maxArea = area;
+        }
+      }
+    }
+    return maxArea;
+  }
+
   intersects(other: ViewPort) {
-    return this.intersectionArea(other) > 0;
+    return this.normalizedIntersectionArea(other) / Math.min(this.area(), other.area()) > 1 / 100;
   }
 
   area() {

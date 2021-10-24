@@ -3,6 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getDatabase, ref, query, get, DatabaseReference, child, QueryConstraint, Database, startAt, orderByKey, endBefore, limitToLast } from "firebase/database";
 import { Point, ViewPort } from "./viewport";
 
+const rootViewPort = new ViewPort(new Point(-180, -90), new Point(180, 90));
 export class Chunkloader {
     public cache: Chunks = {};
     private dbRef: DatabaseReference;
@@ -36,13 +37,13 @@ export class Chunkloader {
         const maxWidth = 360;
         const ratio = width / maxWidth;
         const p = 0.3;
-        const resolutions = ['c', 'l', 'i'];
+        const resolutions = ['c', 'l'];
         for (let i = 0; i < resolutions.length; i++) {
             if (ratio > p ** (i + 1)) {
                 return resolutions[i];
             }
         }
-        return 'i';
+        return 'l';
     }
 
     public getChunksInView(viewport: ViewPort): Chunk[] {
@@ -54,8 +55,7 @@ export class Chunkloader {
             if (!box.intersects(target)) {
                 return;
             }
-
-            if (box.intersectionArea(target) / box.area() > 0.5) {
+            if (box.normalizedIntersectionArea(target) / box.area() > 0.5) {
                 chunks.push(chunk);
             } else {
                 const subBoxes = box.getQuadrants();
@@ -65,8 +65,30 @@ export class Chunkloader {
             }
         }
 
-        const rootViewPort = new ViewPort(new Point(-180, -90), new Point(180, 90));
         addChunksInBox(rootViewPort, resolution);
+        return chunks;
+    }
+
+    private getChunksinViewFromCache(target: ViewPort) {
+        const chunks: Chunk[] = [];
+        const resolution = this.getResolution(target);
+
+        function addChunksInBox(box: ViewPort, chunk: Chunk, cache: Chunks) {
+            if (!box.intersects(target) || cache[chunk] === undefined) {
+                return;
+            }
+            if (cache[chunk].length > 0) {
+                chunks.push(chunk);
+                return;
+            }
+
+            const subBoxes = box.getQuadrants();
+            for (let i = 0; i < subBoxes.length; i++) {
+                addChunksInBox(subBoxes[i], chunk + (i + 1), cache);
+            }
+        }
+
+        addChunksInBox(rootViewPort, resolution, this.cache);
         return chunks;
     }
 
@@ -84,13 +106,16 @@ export class Chunkloader {
 
     // Checks if a chunk or an ancestor is loaded into cache
     private chunkLoaded(chunk: Chunk) {
-        if (Object.keys(this.cache).includes(chunk)) {
+        if (this.cache[chunk] !== undefined) {
             return true;
         }
-        if (chunk.length === 1) {
-            return false;
+        for (let i = 1; i < chunk.length - 1; i++) {
+            const ancestor = this.cache[chunk.slice(0, i)];
+            if (ancestor !== undefined && ancestor.length > 0) {
+                return true;
+            }
         }
-        return this.chunkLoaded(chunk.slice(0, -1));
+        return false;
     }
 
     // Loads a single chunk into cache, returns null if chunk does not exist and is not in cache
@@ -101,9 +126,9 @@ export class Chunkloader {
         console.log(`Loading chunk ${chunk}`);
         this.cache[chunk] = [];
         const snapshot = await get(query(this.dbRef, orderByKey(), startAt(chunk), endBefore(this.nextChunk(chunk))));
-        console.log(snapshot.val());
+        //console.log(snapshot.val());
         if (!snapshot.exists()) {
-            this.cache[chunk] = [];
+            this.cache[chunk] = [[[0, 0], [0, 0]]]; // Temp value to show that the chunk is being loaded
             // Query parent chunk
             const parentSnapshot = await get(query(this.dbRef, orderByKey(), startAt(chunk[0]), endBefore(chunk), limitToLast(1)));
             if (!parentSnapshot.exists()) {
@@ -111,22 +136,31 @@ export class Chunkloader {
                 return;
             }
 
-            Object.assign(this.cache, parentSnapshot.val());
-            return this.cache[chunk];
+            return addSnapshotToCache(parentSnapshot, this.cache);
         }
         
-        Object.assign(this.cache, snapshot.val());
-        return this.cache[chunk];
+        return addSnapshotToCache(snapshot, this.cache);
+
+        function addSnapshotToCache(parentSnapshot, cache: Chunks) {
+            const json = parentSnapshot.val();
+            // Mark all ancestors as loaded by setting them to an empty array
+            for (let chunk of Object.keys(json)) {
+                for (let i = 1; i < chunk.length; i++) {
+                    json[chunk.slice(0, i)] = [];
+                }
+            }
+            Object.assign(cache, json);
+            return cache[chunk];
+        }
     }
 
     public getLines(viewport: ViewPort) {
         let lines: RawLine[] = [];
-        const resolution = this.getResolution(viewport);
+        const chunks = this.getChunksinViewFromCache(viewport);
+        // console.log(chunks, this.cache);
         // flatten the lines into a single array
-        for (const [chunk, lines1] of Object.entries(this.cache)) {
-            if (chunk.startsWith(resolution)) {
-                lines = lines.concat(lines1);
-            }
+        for (const chunk of chunks) {
+            lines = lines.concat(this.cache[chunk]);
         }
         lines = lines.map(line => {
             const [p1, p2] = line;
