@@ -8,13 +8,15 @@ export class Point {
   constructor(public x: number, public y: number) {
   }
 }
-class Line {
-  constructor(public p1: Point, public p2: Point) {
-  }
-}
+
 export class ViewPort {
+  public velocity: Point;
+  public lastTime: number;
+
   constructor(public p1: Point, public p2: Point) {
     // p1 is bottom right, p2 is top left
+    this.velocity = new Point(0, 0);
+    this.lastTime = 0;
   }
 
   get width() {
@@ -61,14 +63,47 @@ export class ViewPort {
     return new Point(lng, lat);
   }
 
-  panTo(cursor: Point, lockedLatLng: Point, canvas: HTMLCanvasElement) {
+  panTo(cursor: Point, lockedLatLng: Point, time: number, canvas: HTMLCanvasElement) {
     const cursorLatLng = this.screenToLatLng(cursor, canvas);
-    const latDiff = lockedLatLng.y - cursorLatLng.y;
-    const lngDiff = lockedLatLng.x - cursorLatLng.x;
-    this.p1.y += latDiff;
-    this.p2.y += latDiff;
-    this.p1.x += lngDiff;
-    this.p2.x += lngDiff;
+    const dy = lockedLatLng.y - cursorLatLng.y;
+    const dx = lockedLatLng.x - cursorLatLng.x;
+    this.p1.y += dy;
+    this.p2.y += dy;
+    this.p1.x += dx;
+    this.p2.x += dx;
+
+    // exponential averaging
+    const maxVelocity = this.width / 1000;
+    const dt = time - this.lastTime;
+    const vx = clip(dx / dt, -maxVelocity, maxVelocity);
+    const vy = clip(dy / dt, -maxVelocity, maxVelocity);
+    this.velocity.x = (this.velocity.x + vx) / 2;
+    this.velocity.y = (this.velocity.y + vy) / 2;
+    this.lastTime = time;
+    this.normalize();
+
+    function clip(x, min, max) {
+      if (x < min) {
+        return min;
+      } else if (x > max) {
+        return max;
+      } else {
+        return x;
+      }
+    }
+  }
+
+  accelerate(time: number) {
+    const dt = time - this.lastTime;
+    this.lastTime = time;
+    const dx = this.velocity.x * dt;
+    const dy = this.velocity.y * dt;
+    this.p1.x += dx;
+    this.p2.x += dx;
+    this.p1.y += dy;
+    this.p2.y += dy;
+    this.velocity.x *= 0.8;
+    this.velocity.y *= 0.8;
     this.normalize();
   }
 

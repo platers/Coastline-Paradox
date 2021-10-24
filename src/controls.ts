@@ -33,7 +33,7 @@ export function addMouseHandlers(viewport: ViewPort, lockedLatLng: Point, canvas
   canvas.addEventListener("mousemove", e => {
     if (lockedLatLng) {
       const cursor = new Point(e.x, e.y);
-      viewport.panTo(cursor, lockedLatLng, canvas);
+      viewport.panTo(cursor, lockedLatLng, e.timeStamp, canvas);
     }
   });
 }

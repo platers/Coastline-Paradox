@@ -18,7 +18,12 @@ export async function main(chunkloader: Chunkloader) {
   let lockedLatLng: Point | null = null;
 
   // Render loop
-  async function render() {
+  async function render(timestamp: number) {
+    // Update viewport
+    if (!lockedLatLng) {
+      viewport.accelerate(timestamp);
+    }
+
     // Get chunks
     chunkloader.loadChunks(viewport);
     // log cache size
