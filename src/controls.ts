@@ -1,3 +1,4 @@
+import { Chunkloader } from './chunkloader';
 import { ViewPort, Point, Direction } from './viewport';
 
 export function addKeyboardArrowHandlers(viewport: ViewPort) {
@@ -40,5 +41,12 @@ export function addScrollHandlers(viewport: ViewPort, canvas: HTMLCanvasElement)
   document.addEventListener("wheel", e => {
     const amount = e.deltaY > 0 ? 0.1 : -0.1;
     viewport.zoom(new Point(e.x, e.y), canvas, amount);
+    console.log('zoom');
+  });
+}
+export function addDebugMouseHandlers(viewport: ViewPort, chunkloader: Chunkloader, canvas: HTMLCanvasElement) {
+  canvas.addEventListener("mousedown", e => {
+    const pt = viewport.screenToLatLng(new Point(e.x, e.y), canvas);
+    console.log(chunkloader.getChunkContaining(pt, viewport));
   });
 }

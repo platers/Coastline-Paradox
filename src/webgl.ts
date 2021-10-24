@@ -1,4 +1,4 @@
-import { addKeyboardArrowHandlers, addScrollHandlers, addMouseHandlers } from './controls';
+import { addKeyboardArrowHandlers, addScrollHandlers, addMouseHandlers, addDebugMouseHandlers } from './controls';
 import { Chunkloader } from './chunkloader';
 import { Chunks, RawLine } from './types';
 import { ViewPort, Point } from './viewport';
@@ -22,7 +22,7 @@ export async function main(chunkloader: Chunkloader) {
     // Get chunks
     chunkloader.loadChunks(viewport);
     // log cache size
-    console.log(chunkloader.cacheSize());
+    // console.log(chunkloader.cacheSize());
     
 
     // Tell WebGL how to convert from clip space to pixels
@@ -48,6 +48,7 @@ export async function main(chunkloader: Chunkloader) {
   addKeyboardArrowHandlers(viewport);
   addScrollHandlers(viewport, canvas);
   addMouseHandlers(viewport, lockedLatLng, canvas);
+  addDebugMouseHandlers(viewport, chunkloader, canvas);
 }
 
 

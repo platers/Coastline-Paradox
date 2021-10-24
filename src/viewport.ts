@@ -183,4 +183,8 @@ export class ViewPort {
     return quadrants;
   }
 
+  contains(latLng: Point) {
+    return latLng.x >= this.p1.x && latLng.x <= this.p2.x && latLng.y >= this.p1.y && latLng.y <= this.p2.y;
+  }
+
 }

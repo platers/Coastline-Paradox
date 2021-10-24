@@ -1,6 +1,6 @@
 import { Chunk, Chunks, RawLine } from "./types";
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, query, get, DatabaseReference, child, QueryConstraint, Database, startAt, orderByKey, endBefore, limitToLast } from "firebase/database";
+import { getDatabase, ref, query, get, DatabaseReference, child, QueryConstraint, Database, startAt, orderByKey, endBefore, limitToLast, endAt } from "firebase/database";
 import { Point, ViewPort } from "./viewport";
 
 const rootViewPort = new ViewPort(new Point(-180, -90), new Point(180, 90));
@@ -8,6 +8,8 @@ export class Chunkloader {
     public cache: Chunks = {};
     private dbRef: DatabaseReference;
     private padding = 1.4;
+    private subtreeLoaded: { [chunk: string]: boolean } = {};
+    private loading: { [chunk: string]: boolean } = {};
 
     constructor() {
         // TODO: Add SDKs for Firebase products that you want to use
@@ -106,12 +108,11 @@ export class Chunkloader {
 
     // Checks if a chunk or an ancestor is loaded into cache
     private chunkLoaded(chunk: Chunk) {
-        if (this.cache[chunk] !== undefined) {
+        if (this.loading[chunk]) {
             return true;
         }
-        for (let i = 1; i < chunk.length - 1; i++) {
-            const ancestor = this.cache[chunk.slice(0, i)];
-            if (ancestor !== undefined && ancestor.length > 0) {
+        for (let i = 1; i < chunk.length; i++) {
+            if (this.subtreeLoaded[chunk.slice(0, i)] || this.loading[chunk.slice(0, i)]) {
                 return true;
             }
         }
@@ -123,22 +124,24 @@ export class Chunkloader {
         if (this.chunkLoaded(chunk)) {
             return;
         }
-        console.log(`Loading chunk ${chunk}`);
-        this.cache[chunk] = [];
-        const snapshot = await get(query(this.dbRef, orderByKey(), startAt(chunk), endBefore(this.nextChunk(chunk))));
-        //console.log(snapshot.val());
+        console.log(`Loading chunks under ${chunk}`, this.cache);
+        this.loading[chunk] = true;
+        const snapshot = await get(query(this.dbRef, orderByKey(), startAt(chunk), endAt(this.nextChunk(chunk))));
         if (!snapshot.exists()) {
-            this.cache[chunk] = [[[0, 0], [0, 0]]]; // Temp value to show that the chunk is being loaded
             // Query parent chunk
+            console.log('Loading parent chunk of', chunk);
+            this.subtreeLoaded[chunk] = true;
             const parentSnapshot = await get(query(this.dbRef, orderByKey(), startAt(chunk[0]), endBefore(chunk), limitToLast(1)));
             if (!parentSnapshot.exists()) {
                 console.log(`Could not find parent. (should not happen)`);
                 return;
             }
-
+            const parent = Object.keys(parentSnapshot.val())[0];
+            this.loadChunk(parent);
+            console.log('Parent loaded', parent);
             return addSnapshotToCache(parentSnapshot, this.cache);
         }
-        
+        this.subtreeLoaded[chunk] = true;
         return addSnapshotToCache(snapshot, this.cache);
 
         function addSnapshotToCache(parentSnapshot, cache: Chunks) {
@@ -162,6 +165,18 @@ export class Chunkloader {
         for (const chunk of chunks) {
             lines = lines.concat(this.cache[chunk]);
         }
+
+        // for debugging, draw lines on chunk borders
+        const chunksInView = this.getChunksInView(viewport);
+        for (const chunk of chunksInView) {
+            const vp = this.chunkToViewPort(chunk);
+            lines.push([[vp.p1.x, vp.p1.y], [vp.p2.x, vp.p1.y]]);
+            lines.push([[vp.p1.x, vp.p1.y], [vp.p1.x, vp.p2.y]]);
+            lines.push([[vp.p2.x, vp.p1.y], [vp.p2.x, vp.p2.y]]);
+            lines.push([[vp.p1.x, vp.p2.y], [vp.p2.x, vp.p2.y]]);
+            lines.push([[vp.p1.x, vp.p1.y], [vp.p2.x, vp.p2.y]]);
+            lines.push([[vp.p1.x, vp.p2.y], [vp.p2.x, vp.p1.y]]);
+        }
         lines = lines.map(line => {
             const [p1, p2] = line;
             const vp1 = viewport.p1;
@@ -184,6 +199,7 @@ export class Chunkloader {
             }
             return [p1, p2];
         });
+
         return lines;
     }
 
@@ -194,5 +210,29 @@ export class Chunkloader {
             size += lines.length;
         }
         return size; 
+    }
+
+    private chunkToViewPort(chunk: Chunk) {
+        return getViewport(rootViewPort, chunk.slice(1));
+
+        function getViewport(box: ViewPort, chunk: Chunk): ViewPort {
+            if(chunk.length === 0) {
+                return box;
+            }
+            const subBoxes = box.getQuadrants();
+            const index = chunk.charCodeAt(0) - '1'.charCodeAt(0);
+            return getViewport(subBoxes[index], chunk.slice(1));
+        }
+    }
+
+    public getChunkContaining(point: Point, viewport: ViewPort) {
+        const chunks = this.getChunksInView(viewport);
+        for (const chunk of chunks) {
+            const vp = this.chunkToViewPort(chunk);
+            if (vp.contains(point)) {
+                return chunk;
+            }
+        }
+        return null;
     }
 }
