@@ -7,7 +7,7 @@ const rootViewPort = new ViewPort(new Point(-180, -90), new Point(180, 90));
 export class Chunkloader {
     public cache: Chunks = {};
     private dbRef: DatabaseReference;
-    private padding = 1.4;
+    private padding = 1.;
     private subtreeLoaded: { [chunk: string]: boolean } = {};
     private loading: { [chunk: string]: boolean } = {};
     private potentialParent: { [chunk: string]: boolean } = {};
