@@ -10,6 +10,7 @@ export class Chunkloader {
     private padding = 1.4;
     private subtreeLoaded: { [chunk: string]: boolean } = {};
     private loading: { [chunk: string]: boolean } = {};
+    private potentialParent: { [chunk: string]: boolean } = {};
 
     constructor() {
         // TODO: Add SDKs for Firebase products that you want to use
@@ -108,11 +109,9 @@ export class Chunkloader {
 
     // Checks if a chunk or an ancestor is loaded into cache
     private chunkLoaded(chunk: Chunk) {
-        if (this.loading[chunk]) {
-            return true;
-        }
-        for (let i = 1; i < chunk.length; i++) {
-            if (this.subtreeLoaded[chunk.slice(0, i)] || this.loading[chunk.slice(0, i)]) {
+        for (let i = 1; i <= chunk.length; i++) {
+            const c = chunk.slice(0, i);
+            if (this.subtreeLoaded[c] || this.loading[c] || this.potentialParent[c]) {
                 return true;
             }
         }
@@ -129,11 +128,13 @@ export class Chunkloader {
         const snapshot = await get(query(this.dbRef, orderByKey(), startAt(chunk), endAt(this.nextChunk(chunk))));
         if (!snapshot.exists()) {
             // Query parent chunk
+            this.loading[chunk] = false;
             if (this.chunkLoaded(chunk)) {
                 return;
             }
             console.log('Loading parent chunk of', chunk);
             this.subtreeLoaded[chunk] = true;
+            this.potentialParent[chunk.slice(0, -1)] = true;
             const parentSnapshot = await get(query(this.dbRef, orderByKey(), startAt(chunk[0]), endBefore(chunk), limitToLast(1)));
             if (!parentSnapshot.exists()) {
                 console.log(`Could not find parent. (should not happen)`);
@@ -145,6 +146,7 @@ export class Chunkloader {
             return addSnapshotToCache(parentSnapshot, this.cache);
         }
         this.subtreeLoaded[chunk] = true;
+        this.loading[chunk] = false;
         return addSnapshotToCache(snapshot, this.cache);
 
         function addSnapshotToCache(parentSnapshot, cache: Chunks) {

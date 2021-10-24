@@ -35,7 +35,7 @@ export async function main(chunkloader: Chunkloader) {
     gl.uniform4f(viewportUniformLocation, viewport.p1.x, viewport.p1.y, viewport.p2.x, viewport.p2.y);
 
     // Get lines
-    const lines = chunkloader.getLines(viewport);
+    const lines = chunkloader.getLines(viewport, false);
 
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(lines.flat().flat()), gl.STATIC_DRAW);
     drawLines(gl, lines.length);
