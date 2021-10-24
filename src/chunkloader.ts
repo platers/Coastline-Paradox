@@ -124,11 +124,14 @@ export class Chunkloader {
         if (this.chunkLoaded(chunk)) {
             return;
         }
-        console.log(`Loading chunks under ${chunk}`, this.cache);
+        // console.log(`Loading chunks under ${chunk}`, this.cache);
         this.loading[chunk] = true;
         const snapshot = await get(query(this.dbRef, orderByKey(), startAt(chunk), endAt(this.nextChunk(chunk))));
         if (!snapshot.exists()) {
             // Query parent chunk
+            if (this.chunkLoaded(chunk)) {
+                return;
+            }
             console.log('Loading parent chunk of', chunk);
             this.subtreeLoaded[chunk] = true;
             const parentSnapshot = await get(query(this.dbRef, orderByKey(), startAt(chunk[0]), endBefore(chunk), limitToLast(1)));
@@ -137,8 +140,8 @@ export class Chunkloader {
                 return;
             }
             const parent = Object.keys(parentSnapshot.val())[0];
-            this.loadChunk(parent);
-            console.log('Parent loaded', parent);
+            // this.loadChunk(parent);
+            // console.log('Parent loaded', parent);
             return addSnapshotToCache(parentSnapshot, this.cache);
         }
         this.subtreeLoaded[chunk] = true;
