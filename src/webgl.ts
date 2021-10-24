@@ -15,12 +15,12 @@ export async function main(chunkloader: Chunkloader) {
   var { viewportUniformLocation } = setupGl(gl);
   // State
   const viewport: ViewPort = new ViewPort(new Point(-180, -90), new Point(180, 90));
-  let lockedLatLng: Point | null = null;
+  let lockedLatLng: Point = new Point(0, 0);
 
   // Render loop
   async function render(timestamp: number) {
     // Update viewport
-    if (!lockedLatLng) {
+    if (lockedLatLng.x == 0 && lockedLatLng.y == 0) {
       viewport.accelerate(timestamp);
     }
 

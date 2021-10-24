@@ -25,13 +25,16 @@ export function addKeyboardArrowHandlers(viewport: ViewPort) {
 }
 export function addMouseHandlers(viewport: ViewPort, lockedLatLng: Point, canvas: HTMLCanvasElement) {
   canvas.addEventListener("mousedown", e => {
-    lockedLatLng = viewport.screenToLatLng(new Point(e.x, e.y), canvas);
+    const v = viewport.screenToLatLng(new Point(e.x, e.y), canvas);
+    lockedLatLng.x = v.x;
+    lockedLatLng.y = v.y;
   });
   canvas.addEventListener("mouseup", e => {
-    lockedLatLng = null;
+    lockedLatLng.x = 0;
+    lockedLatLng.y = 0;
   });
   canvas.addEventListener("mousemove", e => {
-    if (lockedLatLng) {
+    if (lockedLatLng.x !== 0 || lockedLatLng.y !== 0) {
       const cursor = new Point(e.x, e.y);
       viewport.panTo(cursor, lockedLatLng, e.timeStamp, canvas);
     }
