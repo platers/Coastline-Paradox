@@ -18,13 +18,13 @@ export class Chunkloader {
         // Your web app's Firebase configuration
         // For Firebase JS SDK v7.20.0 and later, measurementId is optional
         const firebaseConfig = {
-        apiKey: "AIzaSyAs4rLWFbJymfRmC1BdItylcSDwDwI0Meo",
-        authDomain: "coastline-d884f.firebaseapp.com",
-        projectId: "coastline-d884f",
-        storageBucket: "coastline-d884f.appspot.com",
-        messagingSenderId: "176713969683",
-        appId: "1:176713969683:web:08c70e38da50adef9bcfe6",
-        measurementId: "G-J7KFTBJ2L1"
+            apiKey: "AIzaSyAs4rLWFbJymfRmC1BdItylcSDwDwI0Meo",
+            authDomain: "coastline-d884f.firebaseapp.com",
+            projectId: "coastline-d884f",
+            storageBucket: "coastline-d884f.appspot.com",
+            messagingSenderId: "176713969683",
+            appId: "1:176713969683:web:08c70e38da50adef9bcfe6",
+            measurementId: "G-J7KFTBJ2L1"
         };
 
         // Initialize Firebase
@@ -38,14 +38,14 @@ export class Chunkloader {
         const width = viewport.width;
         const maxWidth = 360;
         const ratio = width / maxWidth;
-        const p = 0.3;
-        const resolutions = ['c', 'l'];
+        const p = 0.2;
+        const resolutions = ['c', 'l', 'i', 'h', 'f'];
         for (let i = 0; i < resolutions.length; i++) {
             if (ratio > p ** (i + 1)) {
                 return resolutions[i];
             }
         }
-        return 'l';
+        return 'f';
     }
 
     public getChunksInView(viewport: ViewPort): Chunk[] {
@@ -124,7 +124,7 @@ export class Chunkloader {
         if (this.chunkLoaded(chunk)) {
             return;
         }
-        // console.log(`Loading chunks under ${chunk}`, this.cache);
+        console.log(`Loading chunks under ${chunk}`, this.cache);
         this.loading[chunk] = true;
         const snapshot = await get(query(this.dbRef, orderByKey(), startAt(chunk), endAt(this.nextChunk(chunk))));
         if (!snapshot.exists()) {
@@ -140,8 +140,8 @@ export class Chunkloader {
                 return;
             }
             const parent = Object.keys(parentSnapshot.val())[0];
-            // this.loadChunk(parent);
-            // console.log('Parent loaded', parent);
+            this.loadChunk(parent);
+            console.log('Parent loaded', parent);
             return addSnapshotToCache(parentSnapshot, this.cache);
         }
         this.subtreeLoaded[chunk] = true;
@@ -160,7 +160,7 @@ export class Chunkloader {
         }
     }
 
-    public getLines(viewport: ViewPort) {
+    public getLines(viewport: ViewPort, showChunkborders = false) {
         let lines: RawLine[] = [];
         const chunks = this.getChunksinViewFromCache(viewport);
         // console.log(chunks, this.cache);
@@ -170,15 +170,17 @@ export class Chunkloader {
         }
 
         // for debugging, draw lines on chunk borders
-        const chunksInView = this.getChunksInView(viewport);
-        for (const chunk of chunksInView) {
-            const vp = this.chunkToViewPort(chunk);
-            lines.push([[vp.p1.x, vp.p1.y], [vp.p2.x, vp.p1.y]]);
-            lines.push([[vp.p1.x, vp.p1.y], [vp.p1.x, vp.p2.y]]);
-            lines.push([[vp.p2.x, vp.p1.y], [vp.p2.x, vp.p2.y]]);
-            lines.push([[vp.p1.x, vp.p2.y], [vp.p2.x, vp.p2.y]]);
-            lines.push([[vp.p1.x, vp.p1.y], [vp.p2.x, vp.p2.y]]);
-            lines.push([[vp.p1.x, vp.p2.y], [vp.p2.x, vp.p1.y]]);
+        if (showChunkborders) {
+            const chunksInView = this.getChunksInView(viewport);
+            for (const chunk of chunksInView) {
+                const vp = this.chunkToViewPort(chunk);
+                lines.push([[vp.p1.x, vp.p1.y], [vp.p2.x, vp.p1.y]]);
+                lines.push([[vp.p1.x, vp.p1.y], [vp.p1.x, vp.p2.y]]);
+                lines.push([[vp.p2.x, vp.p1.y], [vp.p2.x, vp.p2.y]]);
+                lines.push([[vp.p1.x, vp.p2.y], [vp.p2.x, vp.p2.y]]);
+                lines.push([[vp.p1.x, vp.p1.y], [vp.p2.x, vp.p2.y]]);
+                lines.push([[vp.p1.x, vp.p2.y], [vp.p2.x, vp.p1.y]]);
+            }
         }
         lines = lines.map(line => {
             const [p1, p2] = line;

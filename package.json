@@ -17,6 +17,8 @@
   },
   "scripts": {
     "dev": "npx rollup --config rollup.config.js -w",
-    "build": "npx rollup -c rollup.config.js"
+    "build": "npx rollup -c rollup.config.js",
+    "upload": "python3 data_processing/upload_data.py",
+    "preprocess": "python3 data_processing/preprocess.py"
   }
 }
