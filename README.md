@@ -40,7 +40,7 @@ Firebase Realtime Database is used as a key-value store. The key is the chunk na
 
 To get all lines that intersect a chunk, we can query the database for all chunks lexicographically between the chunk name and the next chunk. For example, to get all lines that intersect chunk "f12", we can query the database for all chunks between "f12" and "f13". This includes subchunks like "f1211", "f1212", "f1213", "f1214".
 
-If we query a chunk that does not exist, we can get its parent chunk by querying the database for the chunk lexographically before the chunk name. For example, to get the parent of "1214", we query for the first chunk before "f1214". This might return "f12" or "f121".
+If we query a chunk that does not exist, we can get its parent chunk by querying the database for the chunk lexographically before the chunk name. For example, to get the parent of "f1214", we query for the first chunk before "f1214". This might return "f12" or "f121".
 
 By taking advantage of lexical ordering, we avoid the need for a server to process queries.
 
