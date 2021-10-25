@@ -1,6 +1,6 @@
 # Coastline-Paradox
 
-![World map](img/world.png)
+![Demo](img/recording.gif)
 
 This is a web app to view the world map from GSHHG data. This project is purely for learning, and is a very small subset of any commercial map application. 
 
