@@ -51,7 +51,7 @@ export function addDebugMouseHandlers(viewport: ViewPort, chunkloader: Chunkload
   canvas.addEventListener("mousedown", e => {
     const pt = viewport.screenToLatLng(new Point(e.x, e.y), canvas);
     const chunk = chunkloader.getChunkContaining(pt, viewport);
-    console.log(chunk, chunkloader.cache[chunk]);
+    console.log(chunk);
     // print the cache values of all ancestors
     // for (let i = 0; i < chunk.length; i++) {
     //   const c = chunk.slice(0, i + 1);

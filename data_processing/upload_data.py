@@ -11,16 +11,20 @@ default_app = firebase_admin.initialize_app(cred_obj, {
 ref = db.reference('/')
 
 resolutions = ['c', 'l', 'i', 'h', 'f']
+resolutions = ['c', 'l', 'i', 'h']
 data = {}
 for resolution in resolutions:
     with open('data_processing/chunks/{}.json'.format(resolution)) as json_file:
         d = json.load(json_file)
         # merge d into data
         data.update(d)
-print(data.keys())
-# upload data to firebase in batches of 100
-for i in tqdm.tqdm(range(0, len(data.keys()), 100)):
-    keys = list(data.keys())[i:i+100]
+keys = list(data.keys())
+
+
+batchsize = 1000
+# upload data to firebase in batches
+for i in tqdm.tqdm(range(0, len(keys), batchsize)):
+    keys = list(data.keys())[i:i+batchsize]
     batch = {}
     for key in keys:
         batch[key] = data[key]

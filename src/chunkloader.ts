@@ -40,13 +40,13 @@ export class Chunkloader {
         const maxWidth = 360;
         const ratio = width / maxWidth;
         const p = 0.2;
-        const resolutions = ['c', 'l', 'i', 'h', 'f'];
+        const resolutions = ['c', 'l', 'i', 'h']; // no 'f' because firebase ran out of space
         for (let i = 0; i < resolutions.length; i++) {
             if (ratio > p ** (i + 1)) {
                 return resolutions[i];
             }
         }
-        return 'f';
+        return 'h';
     }
 
     public getChunksInView(viewport: ViewPort): Chunk[] {
